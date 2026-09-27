@@ -98,19 +98,15 @@ def main():
         return app._panel
 
     def grab_shot():
-        # PrintWindow 渲染窗口自身表面：内容清晰且不受 DWM 过渡动画影响；
-        # LANCZOS 2x 放大保证 README 在高 DPI 屏上的展示清晰度。
-        # 玻璃背景在窗口表面呈深色（模糊背景由 DWM 实时合成，不入截图）。
+        # QA 留档截图（PrintWindow，内容清晰）→ tools/menu_shot.png。
+        # 注意不要写 docs/panel.png——那是 README 用的实机截图，手动维护。
         p = ensure_panel()
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
         img = grab_img(rect, hwnd)
-        from PIL import Image
-        big = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
-        big.save(os.path.join(ROOT, "docs", "panel.png"))
         img.save(os.path.join(ROOT, "tools", "menu_shot.png"))
-        print("screenshot -> docs/panel.png", big.size)
+        print("shot -> tools/menu_shot.png", img.size)
 
     def click_save():
         # 合成点击 Save 按钮中心：验证命中区 + 保存逻辑

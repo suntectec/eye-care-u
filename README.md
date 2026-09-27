@@ -38,7 +38,7 @@ assets/logo.png/.ico 彩色渐变加菲猫 logo（托盘图标 / 面板 / exe �
 tools/               构建 & QA 工具（make_ico、probe_icon_resources、menu_qa、
                      fullview、menu_sim、recolor_logo、extract_exe_icon、glass_probe）
 design/              界面效果图与设计稿
-docs/screenshot.png  控制面板截图
+docs/panel.png       面板实机截图
 dist/                打包产物（git 不入库）
 ```
 
