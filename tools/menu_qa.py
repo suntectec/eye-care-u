@@ -136,11 +136,16 @@ def main():
               "save_count =", app.save_count)
 
     def finish():
+        # 抓图放在测试全部结束、画面稳定之后（450ms 处会撞上 DWM 模糊过渡动画，
+        # 抓出来是糊的）；README 截图与 QA 留档同步生成
         p = ensure_panel()
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        grab_rect(rect, os.path.join(ROOT, "tools", "menu_shot.png"))
+        shot = os.path.join(ROOT, "tools", "menu_shot.png")
+        grab_rect(rect, shot)
+        os.replace(shot, os.path.join(ROOT, "docs", "panel.png"))
+        print("screenshot ->", os.path.join(ROOT, "docs", "panel.png"))
         p.close()
         root.destroy()
 
