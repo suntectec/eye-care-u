@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""托盘控制面板 QA：渲染截图 + Save 合成点击 + 真实鼠标穿透测试。
+"""托盘控制面板 QA：渲染截图（README 用）+ Save 合成点击 + 真实鼠标穿透测试。
 用法: .build-venv/Scripts/python tools/menu_qa.py
-产物: docs/screenshot.png（面板截图，供 README 使用）
+产物: docs/panel.png（面板截图，供 README 使用）、tools/menu_shot.png（QA 留档）
 """
 import ctypes
 import ctypes.wintypes as wt
@@ -18,14 +18,16 @@ gdi32 = ctypes.windll.gdi32
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-def grab_rect(rect, out):
+def grab_img(rect, hwnd):
+    """PrintWindow 渲染窗口自身表面，返回 PIL Image（RGB，窗口原始尺寸）。
+    不要用屏幕 DC 的 CAPTUREBLT BitBlt——accent 模糊层会被一起合成进截图，
+    内容发糊（实机显示不受影响，纯属采集伪影）。"""
     w, h = rect.right - rect.left, rect.bottom - rect.top
     sdc = user32.GetDC(0)
     mdc = gdi32.CreateCompatibleDC(sdc)
     bmp = gdi32.CreateCompatibleBitmap(sdc, w, h)
     gdi32.SelectObject(mdc, bmp)
-    gdi32.BitBlt(mdc, 0, 0, w, h, sdc, rect.left, rect.top,
-                 0x00CC0020 | 0x40000000)   # SRCCOPY | CAPTUREBLT
+    user32.PrintWindow(hwnd, mdc, 2)   # PW_RENDERFULLCONTENT
 
     class H(ctypes.Structure):
         _fields_ = [("s", wt.DWORD), ("w", wt.LONG), ("h", wt.LONG),
@@ -42,8 +44,7 @@ def grab_rect(rect, out):
     gdi32.GetDIBits(mdc, bmp, 0, h, buf, ctypes.byref(bi), 0)
     from PIL import Image
     img = Image.frombuffer("RGBA", (w, h), bytes(buf), "raw", "BGRA", 0, 1)
-    img.convert("RGB").save(out)
-    print("panel shot:", out, img.size)
+    return img.convert("RGB")
 
 
 def main():
@@ -97,12 +98,19 @@ def main():
         return app._panel
 
     def grab_shot():
+        # PrintWindow 渲染窗口自身表面：内容清晰且不受 DWM 过渡动画影响；
+        # LANCZOS 2x 放大保证 README 在高 DPI 屏上的展示清晰度。
+        # 玻璃背景在窗口表面呈深色（模糊背景由 DWM 实时合成，不入截图）。
         p = ensure_panel()
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        grab_rect(rect, os.path.join(ROOT, "docs", "panel.png"))
-        print("screenshot ->", os.path.join(ROOT, "docs", "panel.png"))
+        img = grab_img(rect, hwnd)
+        from PIL import Image
+        big = img.resize((img.width * 2, img.height * 2), Image.LANCZOS)
+        big.save(os.path.join(ROOT, "docs", "panel.png"))
+        img.save(os.path.join(ROOT, "tools", "menu_shot.png"))
+        print("screenshot -> docs/panel.png", big.size)
 
     def click_save():
         # 合成点击 Save 按钮中心：验证命中区 + 保存逻辑
@@ -136,16 +144,8 @@ def main():
               "save_count =", app.save_count)
 
     def finish():
-        # 抓图放在测试全部结束、画面稳定之后（450ms 处会撞上 DWM 模糊过渡动画，
-        # 抓出来是糊的）；README 截图与 QA 留档同步生成
         p = ensure_panel()
-        hwnd = m.native_hwnd(p.win)
-        rect = wt.RECT()
-        user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        shot = os.path.join(ROOT, "tools", "menu_shot.png")
-        grab_rect(rect, shot)
-        os.replace(shot, os.path.join(ROOT, "docs", "panel.png"))
-        print("screenshot ->", os.path.join(ROOT, "docs", "panel.png"))
+        grab_shot()   # 测试结束后再抓一张留档（面板状态可能已被测试改动）
         p.close()
         root.destroy()
 
