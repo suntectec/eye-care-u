@@ -63,6 +63,18 @@ def main():
     app.root = root
     app.on = True                      # 运行中状态
     app.settings = m.load_settings()
+    # 截图展示真实使用状态：优先读取 dist/ 里的用户实际配色
+    dist_settings = os.path.join(ROOT, "dist", "eye_care_u_settings.json")
+    if os.path.exists(dist_settings):
+        import json
+        try:
+            with open(dist_settings, "r", encoding="utf-8") as f:
+                vals = json.load(f)
+            for k in ("r", "g", "b", "strength"):
+                if k in vals:
+                    app.settings[k] = vals[k]
+        except Exception:
+            pass
     app.actions = queue.Queue()
     app._panel = None
     app.save_count = 0
@@ -89,11 +101,8 @@ def main():
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        shot = os.path.join(ROOT, "tools", "menu_shot.png")
-        grab_rect(rect, shot)
-        docs = os.path.join(ROOT, "docs", "screenshot.png")
-        os.replace(shot, docs)
-        print("screenshot ->", docs)
+        grab_rect(rect, os.path.join(ROOT, "docs", "panel.png"))
+        print("screenshot ->", os.path.join(ROOT, "docs", "panel.png"))
 
     def click_save():
         # 合成点击 Save 按钮中心：验证命中区 + 保存逻辑

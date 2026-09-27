@@ -1,6 +1,6 @@
 # Eye Care U（eye-care-u）
 
-![Eye Care U 控制面板](docs/screenshot.png)
+![Eye Care U 控制面板](docs/panel.png)
 
 Windows 托盘常驻护眼工具：改写显卡驱动层 Gamma Ramp 给屏幕物理输出染色，
 压低黑白对比度。无遮罩窗口、零输入干扰，任何分辨率/多显示器全覆盖
