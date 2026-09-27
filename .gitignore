@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 打包产物与本地环境（build.bat 一键重建）
+build/
+dist/
+.build-venv/
+
+# 运行期日志与本地设置
+*.log
+eye_care_u_settings.json
+
+# QA 截图产物（tools/*.py 运行时生成）
+tools/*.png
