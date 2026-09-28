@@ -85,10 +85,9 @@ def main():
         m.save_settings(app.settings)
     app.save_action = fake_save
 
-    # QA 运行在活桌面上，焦点随时会被其他应用抢走；禁用 FocusOut 自动收起，
-    # 面板的开/关由测试显式控制
-    m.GlassPanel._on_focus_out = lambda self, _e: None
-
+    # 不要 stub 掉 GlassPanel._on_focus_out！面板“失焦即收起”正是真实使用路径，
+    # 曾经被 stub 后漏测出“第一次按下就把面板 destroy 掉”的严重 bug
+    # （canvas.focus_set 触发 Toplevel FocusOut）。现在由 real_check 显式断言。
     panel = m.GlassPanel(app)
 
     def ensure_panel():
@@ -136,6 +135,10 @@ def main():
         user32.mouse_event(0x0004, 0, 0, 0, 0)   # LEFTUP
 
     def real_check():
+        # 回归断言：真实按下后面板必须还在。若被自己关掉，滑杆就永远拖不动
+        # （press 关掉窗口，后续 <B1-Motion> 无处可去），表现为“无法调色”
+        alive = app._panel is not None and app._panel.win.winfo_exists()
+        print("panel survives click test:", "PASS" if alive else "FAIL")
         print("click-through test:", "PASS" if app.save_count >= 2 else "FAIL",
               "save_count =", app.save_count)
 

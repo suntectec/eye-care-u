@@ -647,8 +647,22 @@ class GlassPanel:
 
     def _on_focus_out(self, _e):
         # 打开瞬间 focus 变化会误触发，延迟 0.3s 后才允许自动收起
-        if time.monotonic() - self._opened_at > 0.3:
-            self.close()
+        if time.monotonic() - self._opened_at <= 0.3:
+            return
+        # 焦点被面板自己的子控件抢走（按下时 canvas.focus_set、点击激活窗口）
+        # 也会送 FocusOut 给 Toplevel，这不是“点了面板外”：按收起语义
+        # 只应该由“点到别的应用”触发，故用指针位置判定。
+        # 否则第一次按下就把面板 destroy 掉，滑杆拖不动、按钮点不到。
+        w = self.win
+        try:
+            px, py = w.winfo_pointerx(), w.winfo_pointery()
+            x, y = w.winfo_rootx(), w.winfo_rooty()
+            if (x <= px <= x + w.winfo_width()
+                    and y <= py <= y + w.winfo_height()):
+                return
+        except Exception:
+            pass
+        self.close()
 
     def close(self, *_e):
         try:
