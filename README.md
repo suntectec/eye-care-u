@@ -53,3 +53,7 @@ python eye_care_u.py --test   # 无界面染色 3 秒自测
 - **换 logo 只改一个文件**：`assets/logo.png` 是唯一来源，build.bat 打包前自动
   从它重生成 `logo.ico`，与托盘图标和面板永远同步。
 - HDR / 10bit 显示模式下 Gamma Ramp 不可用，程序会写 `eye_care_u_error.log`。
+
+## 许可证
+
+[MIT](LICENSE)
