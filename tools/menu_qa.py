@@ -98,7 +98,8 @@ def main():
 
     def grab_shot():
         # QA 留档截图（PrintWindow，内容清晰）→ tools/menu_shot.png。
-        # 注意不要写 docs/panel.png——那是 README 用的实机截图，手动维护。
+        # 注意不要写 docs/panel.png——README 用图由 tools/panel_render.py
+        # 以 2.5 倍高清渲染生成，直接覆盖会把低分辨率版本写回去。
         p = ensure_panel()
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
