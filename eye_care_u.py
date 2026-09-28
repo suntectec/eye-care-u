@@ -43,7 +43,6 @@ SETTINGS_FILE = os.path.join(BASE_DIR, "eye_care_u_settings.json")
 
 DEFAULTS = {"r": 255, "g": 210, "b": 165, "strength": 0.5}   # 暖琥珀 #FFD2A5（红通道零损失，压蓝为主，f.lux/夜间模式同源的温和色温）
 REAPPLY_SECONDS = 5      # 周期重刷 Gamma，防被游戏/其他软件重置；0 = 关闭
-HOTKEY = "Q"             # Ctrl+Alt+Q 退出并恢复原色彩
 
 # ---- 配色（方案 B 玄青极简 · 半透明玻璃，对照 design/mockup_glass.html）----
 # 玻璃原理：DWM 玻璃配方下 GDI 的纯黑像素渲染为透明（"黑色即玻璃"），
@@ -693,7 +692,6 @@ class App:
 
         self.tray = TrayIcon(self.actions)
         self.tray.start()
-        threading.Thread(target=self.hotkey_listener, daemon=True).start()
         if REAPPLY_SECONDS > 0:
             threading.Thread(target=self.reapplier, daemon=True).start()
 
@@ -820,18 +818,6 @@ class App:
             time.sleep(REAPPLY_SECONDS)
             if self.on:
                 apply_tint(self.current_ramp(), save_original=False)
-
-    def hotkey_listener(self):
-        MOD_ALT, MOD_CONTROL = 0x0001, 0x0002
-        WM_HOTKEY = 0x0312
-        if not user32.RegisterHotKey(None, 1, MOD_ALT | MOD_CONTROL,
-                                     ord(HOTKEY.upper())):
-            return
-        msg = wintypes.MSG()
-        while user32.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
-            if msg.message == WM_HOTKEY:
-                restore()
-                os._exit(0)
 
 
 # ---------------- 入口 ----------------
