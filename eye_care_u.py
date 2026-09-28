@@ -41,7 +41,7 @@ else:
 LOG_FILE = os.path.join(BASE_DIR, "eye_care_u_error.log")
 SETTINGS_FILE = os.path.join(BASE_DIR, "eye_care_u_settings.json")
 
-DEFAULTS = {"r": 180, "g": 180, "b": 180, "strength": 0.5}   # 护眼灰（压低屏幕黑白对比度）
+DEFAULTS = {"r": 255, "g": 210, "b": 165, "strength": 0.5}   # 暖琥珀 #FFD2A5（红通道零损失，压蓝为主，f.lux/夜间模式同源的温和色温）
 REAPPLY_SECONDS = 5      # 周期重刷 Gamma，防被游戏/其他软件重置；0 = 关闭
 HOTKEY = "Q"             # Ctrl+Alt+Q 退出并恢复原色彩
 
