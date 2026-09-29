@@ -55,13 +55,11 @@ def gc(alpha):
 
 
 STRATS = [
-    ("1 blur only (now)", dict(state=3), None),
-    ("2 acrylic a=.35", dict(state=4, argb=gc(0x59)), None),
-    ("3 acrylic a=.55", dict(state=4, argb=gc(0x8C)), None),
-    ("4 acrylic a=.70", dict(state=4, argb=gc(0xB3)), None),
-    ("5 blur+gray50 stip", dict(state=3), ("gray50", "#232932")),
-    ("6 blur+gray75 stip", dict(state=3), ("gray75", "#232932")),
-    ("7 solid", None, None),
+    ("1 blur only (state3)", dict(state=3), None),
+    ("2 acrylic a=.25", dict(state=4, argb=gc(0x40)), None),
+    ("3 acrylic a=.40", dict(state=4, argb=gc(0x66)), None),
+    ("4 acrylic a=.65 (now)", dict(state=4, argb=gc(0xA6)), None),
+    ("5 solid", None, None),
 ]
 
 

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """README 面板截图：真实 GlassPanel 按 SCALE 倍高清渲染，玻璃底由仓库壁纸
-资产软件合成（高斯模糊 + 25% 压暗），全程无 Win+D、不采集真实桌面。
+资产软件合成（轻高斯模糊，对齐实机 state3 纯模糊：无压暗无噪点），
+全程无 Win+D、不采集真实桌面。
 
 实机面板只有 440×296 物理像素（100% DPI 屏），直接截屏再放大必然发虚；
 这里让文字按 SCALE 倍点阵化、矢量元素整体放大、logo 用当前色高清重染，
@@ -29,9 +30,8 @@ SCALE = 2.5      # 440×296 → 1100×740，README 以 440px 展示正好 2.5x �
 RADIUS = 28      # 圆角半径（源图像素）
 OUT = os.path.join(ROOT, "docs", "panel.png")
 WALLPAPER = os.path.join(ROOT, "assets", "wallpaper.png")
-BLUR_RADIUS = 14   # 亚克力模糊强度（合成尺寸下的高斯半径）
-TINT_ALPHA = 0.65  # 压暗档位：与实机 GLASS_TINT_ALPHA（acrylic GradientColor）一致
-NOISE_SIGMA = 18   # acrylic 系统噪点模拟：叠加单色高斯噪点（越淡越接近实机）
+BLUR_RADIUS = 6    # 玻璃模糊强度（合成尺寸下的高斯半径）：轻模糊，
+                   # 对齐实机 state3 纯 DWM 模糊的雾度
 
 
 def cover_crop(img, w, h):
@@ -68,16 +68,10 @@ def load_wallpaper(size):
 
 
 def glass_background(m, size):
-    """亚克力玻璃底：壁纸高斯模糊后向 GLASS_TINT 压暗 TINT_ALPHA，再叠
-    极淡单色噪点——与实机 accent acrylic（blur×(1-α) + tint×α + 系统噪点）
-    的观感对齐"""
-    from PIL import Image, ImageChops, ImageFilter
-    base = load_wallpaper(size).filter(ImageFilter.GaussianBlur(BLUR_RADIUS))
-    tint = Image.new("RGB", base.size, m.GLASS_TINT)
-    out = Image.blend(base, tint, TINT_ALPHA)
-    noise = Image.effect_noise(base.size, NOISE_SIGMA)
-    noise = noise.point(lambda p: 128 + (p - 128) // 6)   # σ≈3 居中 128
-    return ImageChops.add(out, noise.convert("RGB"), 1.0, -128)
+    """玻璃底：壁纸轻高斯模糊，直给画布——实机配方为 state3 纯 DWM 模糊
+    （无压暗无噪点），展示图用同构的软件模糊对版"""
+    from PIL import ImageFilter
+    return load_wallpaper(size).filter(ImageFilter.GaussianBlur(BLUR_RADIUS))
 
 
 def hi_res_panel(m):

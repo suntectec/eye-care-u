@@ -63,9 +63,10 @@ UPDATE_CHECK_INTERVAL = 3600   # 节流：最多每小时匿名请求一次
 # 纯 #000000。
 GLASS_BG = "#000000"           # 画布底：渲染为 acrylic 玻璃，鼠标不穿透
 PANEL_FALLBACK = "#131418"     # 玻璃不可用时的纯色回退
-GLASS_TINT = "#262B33"         # acrylic 压暗色（DWM 侧 blur×(1-α) + 此色×α + 系统噪点）
-GLASS_TINT_ALPHA = 0xA6        # 压暗强度 ≈65%：明显降透，亮色窗口垫底也不刺眼；
-                               # 0=纯模糊（过透，已废弃试验），历史网点版见 963efef
+GLASS_TINT = "#262B33"         # （遗留）acrylic 压暗色：state3 纯模糊配方下不参与
+                               # 合成，保留供回切 acrylic 档位（65% 降透档见
+                               # 54cba6f，10% 高透档见本次之前的工作区）
+GLASS_TINT_ALPHA = 0x1A        # （遗留）同上；state3 下无压暗旋钮
 TEXT_HI = "#F2F3F7"            # 主文字
 TEXT_MD = "#A3A9B6"            # 次级文字（标签）
 TRACK_C = "#31343D"            # 滑轨底
@@ -310,9 +311,9 @@ def enable_glass(hwnd):
     """玻璃背景完整配方（Win10/11 通用）：
     1) DwmEnableBlurBehindWindow：空区域 (0,0,-1,-1) 启用 blur-behind
     2) DwmExtendFrameIntoClientArea：margins 全 -1，玻璃延伸到整个客户区
-    3) ACCENT_ENABLE_ACRYLICBLURBEHIND：GradientColor 用 GLASS_TINT 配
-       GLASS_TINT_ALPHA——压暗在 DWM 侧完成，面板=模糊+固定暗色+系统噪点
-       （真 acrylic 质感，无内容侧网点），透度由 alpha 一处调节
+    3) ACCENT_ENABLE_BLURBEHIND：纯 DWM 模糊，无压暗无噪点——acrylic
+       （state4）的重度模糊由系统固定不可调，实测再降压暗依旧糊成一团
+       （与 panel 图对版只能用它）
     画布保持纯黑即玻璃；绝不用 -transparentcolor 色键（键色像素对鼠标
     穿透，导致面板点击穿模）。
     返回 True 表示系统支持；False 时调用方应回退纯色底。"""
@@ -328,9 +329,7 @@ def enable_glass(hwnd):
         if dwmapi.DwmExtendFrameIntoClientArea(wintypes.HWND(hwnd),
                                                ctypes.byref(mg)) != 0:
             return False
-        tint_abgr = (GLASS_TINT_ALPHA << 24) | int.from_bytes(
-            bytes.fromhex(GLASS_TINT[1:]), "little")   # AABBGGRR
-        acc = ACCENT_POLICY(4, 0, tint_abgr, 0, 0)     # 4 = ACCENT_ENABLE_ACRYLICBLURBEHIND
+        acc = ACCENT_POLICY(3, 0, 0, 0, 0)   # 3 = ACCENT_ENABLE_BLURBEHIND
         data = WCA_DATA(19, ctypes.cast(ctypes.byref(acc), ctypes.c_void_p),
                         ctypes.sizeof(acc))
         user32.SetWindowCompositionAttribute.argtypes = [wintypes.HWND, ctypes.c_void_p]
