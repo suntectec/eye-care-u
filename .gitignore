@@ -6,6 +6,9 @@ __pycache__/
 build/
 dist/
 .build-venv/
+eye-care-u.spec
+# logo.ico 由 tools/make_ico.py 从 logo.png 生成，打包前自动重建
+assets/logo.ico
 
 # 运行期日志与本地设置
 *.log

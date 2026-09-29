@@ -9,13 +9,14 @@ Eye Care U（eye-care-u）—— Windows 系统托盘版护眼工具
       左键/右键托盘图标：弹出玻璃控制面板（Red/Green/Blue/Strength 滑杆 + Save/Exit）
       拖动滑杆即时染色，所见即所得；Save 保存设置；点面板外部或 Esc 关闭
       托盘悬停提示：Eye Care U
-      热键 Ctrl+Alt+Q：退出并恢复原色彩
+      退出唯一入口：面板 Exit 按钮（退出前恢复原色彩）
 
 界面：托盘面板为亚克力半透明玻璃风格（方案 B 玄青极简），
       老系统不支持时自动回退纯色深底，功能不受影响。
 
 构建：build.bat 一键打包（自动从 assets/logo.png 生成多尺寸 ico 再打包）；
-      手动：PyInstaller --onefile --noconsole --name eye-care-u --icon assets/logo.ico
+      手动：先 python tools/make_ico.py 生成 assets/logo.ico（不入库），再
+            PyInstaller --onefile --noconsole --name eye-care-u --icon assets/logo.ico
             --add-data "assets/logo.png;assets" eye_care_u.py
 """
 
@@ -44,7 +45,7 @@ SETTINGS_FILE = os.path.join(BASE_DIR, "eye_care_u_settings.json")
 DEFAULTS = {"r": 255, "g": 210, "b": 165, "strength": 0.5}   # 暖琥珀 #FFD2A5（红通道零损失，压蓝为主，f.lux/夜间模式同源的温和色温）
 REAPPLY_SECONDS = 5      # 周期重刷 Gamma，防被游戏/其他软件重置；0 = 关闭
 
-# ---- 配色（方案 B 玄青极简 · 半透明玻璃，对照 design/mockup_glass.html）----
+# ---- 配色（方案 B 玄青极简 · 半透明玻璃）----
 # 玻璃原理：DWM 玻璃配方下 GDI 的纯黑像素渲染为透明（"黑色即玻璃"），
 # 且黑色区域仍完整接收鼠标——不能用 -transparentcolor 色键（键色像素
 # 对鼠标同样穿透，导致面板点击穿模）。内容里避免绘制纯 #000000。
