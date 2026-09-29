@@ -29,8 +29,9 @@ SCALE = 2.5      # 440×296 → 1100×740，README 以 440px 展示正好 2.5x �
 RADIUS = 28      # 圆角半径（源图像素）
 OUT = os.path.join(ROOT, "docs", "panel.png")
 WALLPAPER = os.path.join(ROOT, "assets", "wallpaper.png")
-BLUR_RADIUS = 8    # 亚克力模糊强度（合成尺寸下的高斯半径），高透
-TINT_ALPHA = 0.0   # 0% 压暗：纯模糊玻璃，与实机当前版本一致（回退版见 963efef）
+BLUR_RADIUS = 14   # 亚克力模糊强度（合成尺寸下的高斯半径）
+TINT_ALPHA = 0.65  # 压暗档位：与实机 GLASS_TINT_ALPHA（acrylic GradientColor）一致
+NOISE_SIGMA = 18   # acrylic 系统噪点模拟：叠加单色高斯噪点（越淡越接近实机）
 
 
 def cover_crop(img, w, h):
@@ -67,12 +68,16 @@ def load_wallpaper(size):
 
 
 def glass_background(m, size):
-    """亚克力玻璃底：壁纸高斯模糊后向 GLASS_TINT 压暗 25%，
-    与实机“黑即玻璃 + GLASS_TINT stipple gray25”的叠加数学对齐"""
-    from PIL import Image, ImageFilter
+    """亚克力玻璃底：壁纸高斯模糊后向 GLASS_TINT 压暗 TINT_ALPHA，再叠
+    极淡单色噪点——与实机 accent acrylic（blur×(1-α) + tint×α + 系统噪点）
+    的观感对齐"""
+    from PIL import Image, ImageChops, ImageFilter
     base = load_wallpaper(size).filter(ImageFilter.GaussianBlur(BLUR_RADIUS))
     tint = Image.new("RGB", base.size, m.GLASS_TINT)
-    return Image.blend(base, tint, TINT_ALPHA)
+    out = Image.blend(base, tint, TINT_ALPHA)
+    noise = Image.effect_noise(base.size, NOISE_SIGMA)
+    noise = noise.point(lambda p: 128 + (p - 128) // 6)   # σ≈3 居中 128
+    return ImageChops.add(out, noise.convert("RGB"), 1.0, -128)
 
 
 def hi_res_panel(m):

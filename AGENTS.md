@@ -36,9 +36,9 @@ build.bat                                    # 打包（先托盘 Exit 退出运
   高清重染），PrintWindow 只采集 Tk 画布自身，最后烤 28px 圆角
 - 实机渲染分辨率有限（见下节 DPI），截屏后位图拉伸必然发虚，
   禁止用"截屏再放大"替代该工具
-- 玻璃底由仓库壁纸资产 assets/wallpaper.png 软件合成（高斯模糊 + 12.5%
-  压暗，对齐实机 GLASS_TINT stipple gray12 的叠加数学），不再 Win+D、
-  不采桌面
+- 玻璃底由仓库壁纸资产 assets/wallpaper.png 软件合成（高斯模糊 + 65%
+  压暗 + 淡噪点，对齐实机 acrylic GradientColor 的 GLASS_TINT/GLASS_TINT_ALPHA
+  叠加数学），不再 Win+D、不采桌面
 - 渲染窗口必须关 DWM 玻璃、先铺背景后显示窗口：DWM 玻璃开着时
   PrintWindow 会把窗口背后的桌面模糊混进半透明区域（踩过的坑）
 - 资产缺失时 panel_render 自动抓当前桌面壁纸缩存入库；想换氛围直接
@@ -51,8 +51,14 @@ build.bat                                    # 打包（先托盘 Exit 退出运
 ## 实现要点
 
 - **玻璃面板**：`DwmEnableBlurBehindWindow` 配空区域 +
-  `DwmExtendFrameIntoClientArea` 的 margins 传 -1 + `SetWindowCompositionAttribute`，
-  画布以纯黑为底，DWM 下黑色即玻璃；方案矩阵见 `tools/glass_probe.py`
+  `DwmExtendFrameIntoClientArea` 的 margins 传 -1 + `SetWindowCompositionAttribute`
+  走 ACCENT_ENABLE_ACRYLICBLURBEHIND，GradientColor 用 GLASS_TINT ×
+  GLASS_TINT_ALPHA 在 DWM 侧统一压暗并带系统噪点（真 acrylic 质感），
+  透度只调 GLASS_TINT_ALPHA 一处；画布以纯黑为底，DWM 下黑色即玻璃，
+  命中测试与像素无关（整窗可点，QA 有真实点击回归）。
+  **红线：绝不用 -transparentcolor 色键**（键色像素对鼠标穿透，点击穿模）；
+  内容侧 stipple 压暗网点已废弃（渲染放大显形、实机/渲染难一致）。
+  方案矩阵见 `tools/glass_probe.py`（改玻璃配方先跑它对比再定）
 - **DPI**：exe 未做 DPI 感知。100% 缩放下面板 440×296 物理像素；125% 缩放下
   被 DWM 虚拟化为 550×370（坐标 ×1.25）。自动化定位面板/合成点击时
   要按实际枚举的窗口尺寸换算，不能写死 440×296；
