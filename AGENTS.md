@@ -7,7 +7,7 @@
 
 ```
 python eye_care_u.py --test                  # 无界面染色 3 秒自测
-.build-venv/Scripts/python tools/menu_qa.py  # 面板 QA：Save 合成点击 + 鼠标穿透回归
+.build-venv/Scripts/python tools/menu_qa.py  # 面板 QA：Save 合成点击 + 鼠标穿透 + 更新条回归
 python tools/panel_render.py                 # 重新生成 README 面板截图
 build.bat                                    # 打包（先托盘 Exit 退出运行中的 exe）
 ```
@@ -22,6 +22,9 @@ build.bat                                    # 打包（先托盘 Exit 退出运
 - 正式发布走 CI：推送 `v*` tag 触发 `.github/workflows/release.yml` 自动构建
   并发布 Release，配置 SignPath 密钥后同一流水线自动签名；
   本地打包仅用于验证开箱行为（删掉 exe 同目录 settings 文件即模拟新用户）
+- **发版前必须把 `eye_care_u.py` 的 `APP_VERSION` 改成与 tag 一致**：
+  release.yml 有校验步骤，不一致直接失败（版本号只存在于这一处，
+  CI 不做注入）
 
 ## README 截图（docs/panel.png）
 
@@ -51,6 +54,11 @@ build.bat                                    # 打包（先托盘 Exit 退出运
   （README 已作为已知限制告知用户）
 - **退出路径唯一**：面板 Exit 按钮。热键退出已于本次移除——
   RegisterHotKey 路径在实测中未可靠触发，不再恢复
+- **新版本感知**：启动 30s 后后台匿名查 GitHub Releases API（24h 节流、
+  失败静默、无遥测），结果落 settings 的 `update_*` 三键；提示呈现为
+  面板底部更新条（✕ 关当前版本）+ 首次发现时的一次性托盘气泡。
+  menu_qa 造 `update_latest=999.0.0` 驱动更新条用例，注意它**不会**点条身
+  （会真实打开浏览器）；`--test` 与 QA 不受网络影响（检查延迟 30s 启动）
 
 ## 其他
 

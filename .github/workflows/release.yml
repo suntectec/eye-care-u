@@ -24,6 +24,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # 版本号只在 eye_care_u.py 的 APP_VERSION 一处维护，发版时必须与 tag 一致，
+      # 否则面板“新版本提醒”会拿构建版本比对出错
+      - name: Verify APP_VERSION matches tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: python
+        run: |
+          import os, re, sys
+          src = open("eye_care_u.py", encoding="utf-8").read()
+          m = re.search(r'APP_VERSION\s*=\s*"([^"]+)"', src)
+          ver = m.group(1) if m else None
+          tag = os.environ["GITHUB_REF_NAME"].lstrip("v")
+          if ver != tag:
+              sys.exit("APP_VERSION (%s) != tag (%s): 先更新 eye_care_u.py 的 APP_VERSION 再推 tag" % (ver, tag))
+          print("APP_VERSION OK:", ver)
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'

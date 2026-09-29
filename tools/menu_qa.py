@@ -79,6 +79,8 @@ def main():
     app.actions = queue.Queue()
     app._panel = None
     app.save_count = 0
+    # 造一个“有新版”状态：更新条应出现（999.0.0 恒大于 APP_VERSION）
+    app.settings["update_latest"] = "999.0.0"
 
     def fake_save():
         app.save_count += 1
@@ -143,6 +145,22 @@ def main():
         print("click-through test:", "PASS" if app.save_count >= 2 else "FAIL",
               "save_count =", app.save_count)
 
+    def check_strip_shown():
+        # 更新条：设置里有更大版本号时必须处于“可显示”状态
+        print("update strip shown test:",
+              "PASS" if app._panel._update_available() else "FAIL")
+
+    def click_dismiss():
+        # 合成点击更新条 ✕：验证命中区 + 关闭逻辑。
+        # 不点条身——那条路径会真实打开浏览器
+        app._panel.canvas.event_generate("<Button-1>", x=410, y=284)
+
+    def check_dismiss():
+        p = app._panel
+        ok = (app.settings.get("update_dismissed") == "999.0.0"
+              and p is not None and not p._update_available())
+        print("update strip dismiss test:", "PASS" if ok else "FAIL")
+
     def finish():
         p = ensure_panel()
         grab_shot()   # 测试结束后再抓一张留档（面板状态可能已被测试改动）
@@ -150,11 +168,14 @@ def main():
         root.destroy()
 
     root.after(450, grab_shot)
+    root.after(550, check_strip_shown)
     root.after(700, click_save)
     root.after(950, lambda: check_file(123))
     root.after(1200, real_click)
     root.after(1550, real_check)
-    root.after(1900, lambda: root.after(0, finish))
+    root.after(1750, click_dismiss)
+    root.after(1900, check_dismiss)
+    root.after(2000, lambda: root.after(0, finish))
     root.mainloop()
 
 

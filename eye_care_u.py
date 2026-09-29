@@ -29,9 +29,12 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.request
+import webbrowser
 from ctypes import wintypes
 
 APP_NAME = "Eye Care U"
+APP_VERSION = "1.2.0"    # 发版时必须与 tag 同步更新（release.yml 有校验步骤）
 PID_FILE = os.path.join(tempfile.gettempdir(), "eye_care_u.pid")
 STOP_FILE = os.path.join(tempfile.gettempdir(), "eye_care_u.stop")
 
@@ -42,8 +45,16 @@ else:
 LOG_FILE = os.path.join(BASE_DIR, "eye_care_u_error.log")
 SETTINGS_FILE = os.path.join(BASE_DIR, "eye_care_u_settings.json")
 
-DEFAULTS = {"r": 255, "g": 210, "b": 165, "strength": 0.5}   # 暖琥珀 #FFD2A5（红通道零损失，压蓝为主，f.lux/夜间模式同源的温和色温）
+# 暖琥珀 #FFD2A5（红通道零损失，压蓝为主，f.lux/夜间模式同源的温和色温）
+DEFAULTS = {"r": 255, "g": 210, "b": 165, "strength": 0.5,
+            # 新版本感知：上次检查时间戳 / 已知最新版号 / 用户已关闭提醒的版号
+            "update_check_at": 0.0, "update_latest": "", "update_dismissed": ""}
 REAPPLY_SECONDS = 5      # 周期重刷 Gamma，防被游戏/其他软件重置；0 = 关闭
+
+RELEASES_PAGE = "https://github.com/suntectec/eye-care-u/releases/latest"
+RELEASES_API = "https://api.github.com/repos/suntectec/eye-care-u/releases/latest"
+UPDATE_CHECK_DELAY = 30        # 启动后延迟首次检查，避开启动关键路径
+UPDATE_CHECK_INTERVAL = 86400  # 节流：跨重启最多 24h 匿名请求一次
 
 # ---- 配色（方案 B 玄青极简 · 半透明玻璃）----
 # 玻璃原理：DWM 玻璃配方下 GDI 的纯黑像素渲染为透明（"黑色即玻璃"），
@@ -60,6 +71,10 @@ KNOB_C = "#F2F4F8"             # 旋钮
 SEC_BD = "#4A4E58"             # 按钮描边
 SEC_BD_HOVER = "#71767F"       # 按钮描边（悬停）
 RED = "#E5484D"                # Exit
+UPDATE_C = "#FFD2A5"           # 更新条文字/圆点（与默认配色同源）
+STRIP_BG = "#2A2520"           # 更新条底色
+STRIP_BD = "#4A4034"           # 更新条描边
+STRIP_BD_HOVER = "#6B5C49"     # 更新条描边（悬停）
 PANEL_W, PANEL_H = 440, 296    # 托盘面板尺寸
 
 user32 = ctypes.windll.user32
@@ -208,6 +223,39 @@ def log_error(msg):
         pass
 
 
+def version_gt(a, b):
+    """版本号比较 a > b；解析失败一律 False（宁可漏提示，不误报）"""
+    def parse(v):
+        out = []
+        for part in str(v).strip().lstrip("vV").split("."):
+            digits = ""
+            for ch in part:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            if not digits:
+                return None
+            out.append(int(digits))
+        while len(out) < 3:
+            out.append(0)
+        return tuple(out[:3])
+    pa, pb = parse(a), parse(b)
+    return pa is not None and pb is not None and pa > pb
+
+
+def fetch_latest_version(timeout=5):
+    """匿名查询 GitHub 最新 Release 版本号；任何失败返回 None（静默，绝不打扰）"""
+    try:
+        req = urllib.request.Request(
+            RELEASES_API, headers={"User-Agent": "%s/%s" % (APP_NAME, APP_VERSION)})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            tag = str(json.load(resp).get("tag_name", "")).strip().lstrip("vV")
+        return tag or None
+    except Exception:
+        return None
+
+
 # ---------------- 玻璃背景（blur-behind，参考 token-monitor windowsBackdrop.js） ----------------
 
 class ACCENT_POLICY(ctypes.Structure):
@@ -350,6 +398,21 @@ class TrayIcon:
 
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
+
+    def notify(self, title, msg):
+        """托盘气泡（Win10+ 转为系统通知）：一次性新版提醒。
+        NIIF_RESPECT_QUIET_TIME 遵守系统免打扰；失败静默不重试。"""
+        if not self.nid:
+            return
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(nid)
+        nid.hWnd = self.nid.hWnd
+        nid.uID = self.nid.uID
+        nid.uFlags = 0x10                          # NIF_INFO
+        nid.szInfo = msg
+        nid.szInfoTitle = title
+        nid.dwInfoFlags = 0x1 | 0x80               # NIIF_INFO | NIIF_RESPECT_QUIET_TIME
+        ctypes.windll.shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
 
     def _make_ico(self):
         """从打包的 logo.png 生成托盘用 ico（16/32px），路径同时供窗口图标使用"""
@@ -504,8 +567,10 @@ class GlassPanel:
         self.tx0, self.tx1 = self.x0 + 72, self.x1 - 54
         self.btn_w = (self.x1 - self.x0 - 12) // 2
         self.btn_y0, self.btn_h = 234, 40
+        self.strip_y0, self.strip_h = 277, 14    # 底部更新条（发现新版时出现）
         self.dragging = None
         self.hover_btn = None
+        self.hover_zone = None
         self.saved_until = 0.0
 
         self.draw()
@@ -536,8 +601,14 @@ class GlassPanel:
         # 头部：猫 logo + 应用名
         if self._photo:
             cv.create_image(self.x0, 22, anchor="w", image=self._photo)
-        cv.create_text(self.x0 + 26, 22, anchor="w", text=APP_NAME,
-                       fill=TEXT_HI, font=self.f_title)
+        # 版本号紧跟标题：用 bbox 取实际渲染边界（measure 不含 DPI 放大量，
+        # 125% 缩放下会贴到标题上）
+        t = cv.create_text(self.x0 + 26, 22, anchor="w", text=APP_NAME,
+                           fill=TEXT_HI, font=self.f_title)
+        tb = cv.bbox(t)
+        cv.create_text((tb[2] if tb else self.x0 + 26 + 100) + 12, 22,
+                       anchor="w", text="v" + APP_VERSION,
+                       fill=TEXT_MD, font=self.f_small)
 
         # 色值行：色块 + HEX
         tint = "#%02X%02X%02X" % (int(s["r"]), int(s["g"]), int(s["b"]))
@@ -580,7 +651,33 @@ class GlassPanel:
                        (self.btn_y0 + b_y1) // 2, text="Exit",
                        fill=RED, font=self.f_title)
 
+        # 底部更新条：后台发现新版且未被用户关闭时出现，点击开下载页
+        if self._update_available():
+            sy0, sy1 = self.strip_y0, self.strip_y0 + self.strip_h
+            bd = STRIP_BD_HOVER if self.hover_zone == "update" else STRIP_BD
+            round_rect(cv, self.x0, sy0, self.x1, sy1, 7,
+                       fill=STRIP_BG, outline=bd, width=1)
+            mid = (sy0 + sy1) // 2
+            cv.create_oval(self.x0 + 7, mid - 3, self.x0 + 13, mid + 3,
+                           fill=UPDATE_C, outline="")
+            cv.create_text(self.x0 + 22, mid, anchor="w",
+                           text="新版本 v%s 可用 · 点击前往下载"
+                                % self.app.settings["update_latest"],
+                           fill=UPDATE_C, font=self.f_small)
+            cv.create_text(self.x1 - 9, mid, anchor="e", text="✕",
+                           fill=TEXT_MD, font=self.f_small)
+
     # ---- 交互 ----
+    def _update_available(self):
+        s = self.app.settings
+        latest = s.get("update_latest", "")
+        return (bool(latest) and latest != s.get("update_dismissed", "")
+                and version_gt(latest, APP_VERSION))
+
+    def _strip_at(self, x, y):
+        return (self.x0 <= x <= self.x1
+                and self.strip_y0 - 4 <= y <= self.strip_y0 + self.strip_h + 2)
+
     def _btn_at(self, x, y):
         """按钮命中区：覆盖整个按钮区块（含描边外扩），以两钮中点分界，互不重叠"""
         top, bottom = self.btn_y0 - 6, self.btn_y0 + self.btn_h + 6
@@ -616,6 +713,16 @@ class GlassPanel:
     def _on_press_inner(self, e):
         # 点面板任意处都把焦点从 HEX 输入框移走（失焦回退无效输入）
         self.canvas.focus_set()
+        # 更新条在按钮下方，命中带与按钮外扩带的少量重叠按“越低越靠条”处理
+        if self._update_available() and self._strip_at(e.x, e.y):
+            if e.x >= self.x1 - 22:      # ✕：只关闭当前版本的提醒
+                self.app.settings["update_dismissed"] = \
+                    self.app.settings["update_latest"]
+                save_settings(self.app.settings)
+                self.draw()
+            else:
+                webbrowser.open(RELEASES_PAGE)
+            return
         btn = self._btn_at(e.x, e.y)
         if btn == "save":
             self.app.save_action()
@@ -634,13 +741,15 @@ class GlassPanel:
             self._set_value(self.dragging[0], self.dragging[1], self.dragging[2], e.x)
 
     def _on_motion(self, e):
-        btn = self._btn_at(e.x, e.y)
+        zone = "update" if (self._update_available()
+                            and self._strip_at(e.x, e.y)) else None
+        btn = None if zone else self._btn_at(e.x, e.y)
         row = self._row_at(e.x, e.y)
-        cursor = "hand2" if (btn or row) else ""
+        cursor = "hand2" if (zone or btn or row) else ""
         if self.canvas["cursor"] != cursor:
             self.canvas.configure(cursor=cursor)
-        if btn != self.hover_btn:
-            self.hover_btn = btn
+        if btn != self.hover_btn or zone != self.hover_zone:
+            self.hover_btn, self.hover_zone = btn, zone
             self.draw()
         elif self.dragging:
             self.draw()
@@ -693,6 +802,7 @@ class App:
 
         self.tray = TrayIcon(self.actions)
         self.tray.start()
+        threading.Thread(target=self.update_checker, daemon=True).start()
         if REAPPLY_SECONDS > 0:
             threading.Thread(target=self.reapplier, daemon=True).start()
 
@@ -750,6 +860,34 @@ class App:
             self.save_action()
         elif cmd == "quit":
             self.quit_app()
+        elif isinstance(cmd, tuple) and cmd[0] == "update_found":
+            self.on_update_found(cmd[1])
+
+    # ----- 新版本感知（后台静默：断网 / GitHub 不可达时不打扰） -----
+    def update_checker(self):
+        time.sleep(UPDATE_CHECK_DELAY)
+        while True:
+            try:
+                if (time.time() - float(self.settings.get("update_check_at", 0) or 0)
+                        >= UPDATE_CHECK_INTERVAL):
+                    latest = fetch_latest_version()
+                    if latest:
+                        self.actions.put(("update_found", latest))
+            except Exception:
+                pass
+            time.sleep(600)
+
+    def on_update_found(self, latest):
+        """查到最新 Release：落盘已知版本；首次发现新版才弹一次托盘气泡"""
+        changed = latest != self.settings.get("update_latest", "")
+        self.settings["update_check_at"] = time.time()
+        self.settings["update_latest"] = latest
+        save_settings(self.settings)
+        if changed and version_gt(latest, APP_VERSION):
+            self.tray.notify("Eye Care U v%s 可用" % latest,
+                             "当前 v%s。点击托盘图标打开面板前往下载；"
+                             "用新 exe 覆盖原位置可保留配色设置。" % APP_VERSION)
+            self._refresh_panel()
 
     # ----- 托盘面板 -----
     def toggle_panel(self):
