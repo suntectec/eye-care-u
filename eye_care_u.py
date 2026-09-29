@@ -62,7 +62,7 @@ UPDATE_CHECK_INTERVAL = 3600   # 节流：最多每小时匿名请求一次
 # 对鼠标同样穿透，导致面板点击穿模）。内容里避免绘制纯 #000000。
 GLASS_BG = "#000000"           # 画布底：渲染为玻璃，鼠标不穿透
 PANEL_FALLBACK = "#131418"     # 玻璃不可用时的纯色回退
-GLASS_TINT = "#131418"         # 玻璃底上的暗色叠加（stipple gray25）
+GLASS_TINT = "#262B33"         # 玻璃底上的暗色网点（stipple gray12 × 此色，有效压暗约 6%，高透）
 TEXT_HI = "#F2F3F7"            # 主文字
 TEXT_MD = "#A3A9B6"            # 次级文字（标签）
 TRACK_C = "#31343D"            # 滑轨底
@@ -634,9 +634,9 @@ class GlassPanel:
         cv.delete("all")
         s = self.app.settings
 
-        # 玻璃底：黑色渲染为玻璃（不接收穿透），叠加 25% 暗色保证可读性
+        # 玻璃底：黑色渲染为玻璃（不接收穿透），叠加 12.5% 暗色（高透）
         cv.create_rectangle(0, 0, PANEL_W, PANEL_H, fill=GLASS_TINT,
-                            outline="", stipple="gray25")
+                            outline="", stipple="gray12")
 
         # 头部：猫 logo（染当前色，即色块本体）+ 应用名 + 右侧 HEX 读数
         self._photo = self._tint_photo()

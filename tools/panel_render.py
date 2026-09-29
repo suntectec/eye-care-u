@@ -30,7 +30,7 @@ RADIUS = 28      # 圆角半径（源图像素）
 OUT = os.path.join(ROOT, "docs", "panel.png")
 WALLPAPER = os.path.join(ROOT, "assets", "wallpaper.png")
 BLUR_RADIUS = 8    # 亚克力模糊强度（合成尺寸下的高斯半径），高透
-TINT_ALPHA = 0.12  # 玻璃压暗比例，高透（实机 GLASS_TINT stipple 为 25%）
+TINT_ALPHA = 0.125  # 玻璃压暗比例，对齐实机 GLASS_TINT stipple gray12
 
 
 def cover_crop(img, w, h):
