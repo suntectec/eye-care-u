@@ -634,9 +634,9 @@ class GlassPanel:
         cv.delete("all")
         s = self.app.settings
 
-        # 玻璃底：黑色渲染为玻璃（不接收穿透），叠加 12.5% 暗色（高透）
-        cv.create_rectangle(0, 0, PANEL_W, PANEL_H, fill=GLASS_TINT,
-                            outline="", stipple="gray12")
+        # 玻璃底：黑色渲染为玻璃（不接收穿透）。0% 压暗高透试验——
+        # 纯 DWM 模糊，无任何暗色叠加；回退版见 963efef（gray12 × #262B33 ≈ 6%）
+        pass
 
         # 头部：猫 logo（染当前色，即色块本体）+ 应用名 + 右侧 HEX 读数
         self._photo = self._tint_photo()

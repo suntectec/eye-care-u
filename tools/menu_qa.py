@@ -79,8 +79,10 @@ def main():
     app.actions = queue.Queue()
     app._panel = None
     app.save_count = 0
-    # 造一个“有新版”状态：更新条应出现（999.0.0 恒大于 APP_VERSION）
+    # 造一个“有新版”状态：更新条应出现（999.0.0 恒大于 APP_VERSION）；
+    # 同时清掉上次运行可能留下的已关闭标记，保证用例可重复
     app.settings["update_latest"] = "999.0.0"
+    app.settings["update_dismissed"] = ""
 
     def fake_save():
         app.save_count += 1
