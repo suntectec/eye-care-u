@@ -25,6 +25,9 @@ build.bat                                    # 打包（先托盘 Exit 退出运
 - **发版前必须把 `eye_care_u.py` 的 `APP_VERSION` 改成与 tag 一致**：
   release.yml 有校验步骤，不一致直接失败（版本号只存在于这一处，
   CI 不做注入）
+- **发布后要补 release notes**：CI 的 `--generate-notes` 在无 PR 仓库只生成
+  changelog 链接，需 `gh release edit <tag> --notes` 按"本次变化 + 下载"
+  格式手写（参照 v1.1.0 / v1.2.0）
 
 ## README 截图（docs/panel.png）
 
