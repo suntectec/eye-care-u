@@ -34,7 +34,7 @@ import webbrowser
 from ctypes import wintypes
 
 APP_NAME = "Eye Care U"
-APP_VERSION = "1.4.0"    # 发版时必须与 tag 同步更新（release.yml 有校验步骤）
+APP_VERSION = "1.5.0"    # 发版时必须与 tag 同步更新（release.yml 有校验步骤）
 PID_FILE = os.path.join(tempfile.gettempdir(), "eye_care_u.pid")
 STOP_FILE = os.path.join(tempfile.gettempdir(), "eye_care_u.stop")
 
