@@ -92,18 +92,20 @@ def hi_res_panel(m):
                 scaled[name] = f
             cv.itemconfigure(item, font=scaled[name])
 
-    # 3) logo 位图不会随 scale 放大，换成 SCALE 倍原图
+    # 3) logo 位图不会随 scale 放大，换成 SCALE 倍的当前色染色版
+    #    （实机头部 logo 即色块本体，随配色实时染色——见 GlassPanel._tint_logo_img）
     photos = [i for i in cv.find_withtag("all") if cv.type(i) == "image"]
     if photos:
-        from PIL import Image as PImage, ImageTk
+        from PIL import ImageTk
         item = photos[0]
         x0, y0 = cv.coords(item)
         anchor = cv.itemcget(item, "anchor") or "w"
         cv.delete(item)
-        img = PImage.open(m.resource_path("assets", "logo.png")).convert("RGBA")
         px = round(17 * SCALE)
-        panel._photo = ImageTk.PhotoImage(img.resize((px, px), PImage.LANCZOS))
-        cv.create_image(x0, y0, anchor=anchor, image=panel._photo)
+        tinted = panel._tint_logo_img(px)
+        if tinted is not None:
+            panel._photo = ImageTk.PhotoImage(tinted)
+            cv.create_image(x0, y0, anchor=anchor, image=panel._photo)
 
     # 4) 窗口放大并重新锚定工作区右下角
     wa = m.work_area()

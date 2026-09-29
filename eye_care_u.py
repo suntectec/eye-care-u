@@ -541,13 +541,19 @@ class GlassPanel:
             self.win.configure(bg=PANEL_FALLBACK)
             self.canvas.configure(bg=PANEL_FALLBACK)
 
-        # 头部猫 logo（17px）
+        # 头部猫 logo（17px）：即"色块"本体——按当前配色做双色调染色，
+        # 随滑杆实时变化（方案 A：一图两用）。缓存灰度+alpha 两级：
+        # 全分辨率供 panel_render 放大，17px 供 draw 每次廉价重着色
+        self._logo_hi = None
+        self._logo_17 = None
         self._photo = None
         try:
-            from PIL import Image as PImage, ImageTk
+            from PIL import Image as PImage
             img = PImage.open(resource_path("assets", "logo.png")).convert("RGBA")
-            img = img.resize((17, 17), PImage.LANCZOS)
-            self._photo = ImageTk.PhotoImage(img)
+            lum, alpha = img.convert("L"), img.split()[3]
+            self._logo_hi = (lum, alpha)
+            self._logo_17 = (lum.resize((17, 17), PImage.LANCZOS),
+                             alpha.resize((17, 17), PImage.LANCZOS))
         except Exception:
             pass
 
@@ -559,14 +565,14 @@ class GlassPanel:
 
         self.x0, self.x1 = 24, w - 24
         self.rows = [
-            ("r", "Red", 0, 255, 108),
-            ("g", "Green", 0, 255, 142),
-            ("b", "Blue", 0, 255, 176),
-            ("strength", "Strength", 0.0, 1.0, 210),
+            ("r", "Red", 0, 255, 84),
+            ("g", "Green", 0, 255, 122),
+            ("b", "Blue", 0, 255, 160),
+            ("strength", "Strength", 0.0, 1.0, 198),
         ]
         self.tx0, self.tx1 = self.x0 + 72, self.x1 - 54
         self.btn_w = (self.x1 - self.x0 - 12) // 2
-        self.btn_y0, self.btn_h = 234, 40
+        self.btn_y0, self.btn_h = 228, 40
         self.strip_y0, self.strip_h = 277, 14    # 底部更新条（发现新版时出现）
         self.dragging = None
         self.hover_btn = None
@@ -588,6 +594,38 @@ class GlassPanel:
         self.win.bind("<Escape>", lambda _e: self.close())
         self.win.bind("<FocusOut>", self._on_focus_out)
 
+    # ---- 着色 ----
+    def _tint_logo_img(self, size=17):
+        """当前色双色调猫 logo（PIL Image）：亮部=当前色提亮 25%，暗部=当前色×0.3。
+        PIL 缺失或异常时返回 None（头部退化为纯文字）"""
+        if self._logo_hi is None:
+            return None
+        try:
+            from PIL import Image, ImageOps
+            if size == 17:
+                lum, alpha = self._logo_17
+            else:
+                lum, alpha = self._logo_hi
+                lum = lum.resize((size, size), Image.LANCZOS)
+                alpha = alpha.resize((size, size), Image.LANCZOS)
+            s = self.app.settings
+            c = (int(s["r"]), int(s["g"]), int(s["b"]))
+            hi = tuple(min(255, int(v + (255 - v) * 0.25)) for v in c)
+            lo = tuple(int(v * 0.3) for v in c)
+            img = ImageOps.colorize(lum, black=lo, white=hi).convert("RGBA")
+            img.putalpha(alpha)
+            return img
+        except Exception:
+            return None
+
+    def _tint_photo(self):
+        try:
+            from PIL import ImageTk
+            img = self._tint_logo_img(17)
+            return ImageTk.PhotoImage(img) if img is not None else None
+        except Exception:
+            return None
+
     # ---- 绘制 ----
     def draw(self):
         cv = self.canvas
@@ -598,7 +636,8 @@ class GlassPanel:
         cv.create_rectangle(0, 0, PANEL_W, PANEL_H, fill=GLASS_TINT,
                             outline="", stipple="gray25")
 
-        # 头部：猫 logo + 应用名
+        # 头部：猫 logo（染当前色，即色块本体）+ 应用名 + 右侧 HEX 读数
+        self._photo = self._tint_photo()
         if self._photo:
             cv.create_image(self.x0, 22, anchor="w", image=self._photo)
         # 版本号紧跟标题：用 bbox 取实际渲染边界（measure 不含 DPI 放大量，
@@ -609,13 +648,11 @@ class GlassPanel:
         cv.create_text((tb[2] if tb else self.x0 + 26 + 100) + 12, 22,
                        anchor="w", text="v" + APP_VERSION,
                        fill=TEXT_MD, font=self.f_small)
-
-        # 色值行：色块 + HEX
         tint = "#%02X%02X%02X" % (int(s["r"]), int(s["g"]), int(s["b"]))
-        round_rect(cv, self.x0, 46, self.x0 + 18, 64, 5, fill=tint, outline="")
-        cv.create_text(self.x0 + 28, 55, anchor="w", text=tint,
+        cv.create_text(self.x1, 22, anchor="e", text=tint,
                        fill=TEXT_HI, font=self.f_mono)
-        cv.create_line(self.x0, 84, self.x1, 84, fill="#FFFFFF",
+
+        cv.create_line(self.x0, 54, self.x1, 54, fill="#FFFFFF",
                        stipple="gray12", width=1)
 
         # 滑杆

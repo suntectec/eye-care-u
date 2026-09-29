@@ -114,7 +114,7 @@ def main():
         # 合成点击 Save 按钮中心：验证命中区 + 保存逻辑
         app.settings["r"] = 123
         p = ensure_panel()
-        p.canvas.event_generate("<Button-1>", x=119, y=254)
+        p.canvas.event_generate("<Button-1>", x=119, y=248)
 
     def check_file(expect):
         try:
@@ -131,7 +131,7 @@ def main():
         hwnd = m.native_hwnd(p.win)
         rect = wt.RECT()
         user32.GetWindowRect(hwnd, ctypes.byref(rect))
-        user32.SetCursorPos(rect.left + 119, rect.top + 254)
+        user32.SetCursorPos(rect.left + 119, rect.top + 248)
         time.sleep(0.05)
         user32.mouse_event(0x0002, 0, 0, 0, 0)   # LEFTDOWN
         time.sleep(0.05)
