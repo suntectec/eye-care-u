@@ -75,6 +75,8 @@ UPDATE_C = "#FFD2A5"           # 更新条文字/圆点（与默认配色同源�
 STRIP_BG = "#2A2520"           # 更新条底色
 STRIP_BD = "#4A4034"           # 更新条描边
 STRIP_BD_HOVER = "#6B5C49"     # 更新条描边（悬停）
+DIVIDER_MID = (142, 150, 164)  # 分隔线中段（渐隐线最亮处）
+DIVIDER_EDGE = (36, 41, 50)    # 分隔线两端（融进玻璃底）
 PANEL_W, PANEL_H = 440, 296    # 托盘面板尺寸
 
 user32 = ctypes.windll.user32
@@ -651,6 +653,17 @@ class GlassPanel:
         tint = "#%02X%02X%02X" % (int(s["r"]), int(s["g"]), int(s["b"]))
         cv.create_text(self.x1, 22, anchor="e", text=tint,
                        fill=TEXT_HI, font=self.f_mono)
+
+        # 分隔线：中间亮、两端渐隐进玻璃底。用纯色分段渐变而不用 stipple——
+        # stipple 点阵不随 panel_render 的缩放变细，实机与渲染会不一致
+        n_seg = 56
+        step = (self.x1 - self.x0) / n_seg
+        for i in range(n_seg):
+            t = abs((i + 0.5) / n_seg * 2 - 1)   # 0=中段 1=两端
+            col = "#%02X%02X%02X" % tuple(
+                int(a + (b - a) * t) for a, b in zip(DIVIDER_MID, DIVIDER_EDGE))
+            xa = self.x0 + i * step
+            cv.create_line(xa, 54, xa + step, 54, fill=col, width=1)
 
         # 滑杆
         for key, label, lo, hi, yc in self.rows:
