@@ -652,9 +652,6 @@ class GlassPanel:
         cv.create_text(self.x1, 22, anchor="e", text=tint,
                        fill=TEXT_HI, font=self.f_mono)
 
-        cv.create_line(self.x0, 54, self.x1, 54, fill="#FFFFFF",
-                       stipple="gray12", width=1)
-
         # 滑杆
         for key, label, lo, hi, yc in self.rows:
             cv.create_text(self.x0, yc, anchor="w", text=label,
