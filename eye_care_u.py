@@ -54,7 +54,7 @@ REAPPLY_SECONDS = 5      # 周期重刷 Gamma，防被游戏/其他软件重置�
 RELEASES_PAGE = "https://github.com/suntectec/eye-care-u/releases/latest"
 RELEASES_API = "https://api.github.com/repos/suntectec/eye-care-u/releases/latest"
 UPDATE_CHECK_DELAY = 30        # 启动后延迟首次检查，避开启动关键路径
-UPDATE_CHECK_INTERVAL = 86400  # 节流：跨重启最多 24h 匿名请求一次
+UPDATE_CHECK_INTERVAL = 3600   # 节流：最多每小时匿名请求一次
 
 # ---- 配色（方案 B 玄青极简 · 半透明玻璃）----
 # 玻璃原理：DWM 玻璃配方下 GDI 的纯黑像素渲染为透明（"黑色即玻璃"），
@@ -839,6 +839,7 @@ class App:
 
         self.tray = TrayIcon(self.actions)
         self.tray.start()
+        self._update_kick = threading.Event()   # 打开面板时唤醒检查线程立即评估
         threading.Thread(target=self.update_checker, daemon=True).start()
         if REAPPLY_SECONDS > 0:
             threading.Thread(target=self.reapplier, daemon=True).start()
@@ -912,7 +913,9 @@ class App:
                         self.actions.put(("update_found", latest))
             except Exception:
                 pass
-            time.sleep(600)
+            # 常规 10 分钟一醒；打开面板会立刻唤醒（节流仍生效，不会多打请求）
+            self._update_kick.wait(600)
+            self._update_kick.clear()
 
     def on_update_found(self, latest):
         """查到最新 Release：落盘已知版本；首次发现新版才弹一次托盘气泡"""
@@ -937,6 +940,7 @@ class App:
         try:
             panel = GlassPanel(self)
             self._panel = panel
+            self._update_kick.set()   # 面板已开：检查线程立即评估（节流仍生效）
         except Exception:
             # 构造半途失败时销毁半初始化窗口，避免泄漏一块空玻璃
             import traceback
