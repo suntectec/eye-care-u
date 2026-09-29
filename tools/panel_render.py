@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
-"""README 面板截图：真实 GlassPanel 按 SCALE 倍高清渲染 → PrintWindow 采集 → 烤圆角。
+"""README 面板截图：真实 GlassPanel 按 SCALE 倍高清渲染，玻璃底由仓库壁纸
+资产软件合成（高斯模糊 + 25% 压暗），全程无 Win+D、不采集真实桌面。
 
 实机面板只有 440×296 物理像素（100% DPI 屏），直接截屏再放大必然发虚；
-这里让文字按 SCALE 倍点阵化、矢量元素整体放大、logo 用高清原图重缩放，
-得到真正的高分辨率版本，采集走 menu_qa 的 PrintWindow 路径（玻璃底一并合成）。
-亚克力采样的是窗口后面的真实桌面，故截图前先 Win+D 最小化全部窗口、
-以桌面壁纸为玻璃背景，采集完成后自动再按一次还原。
+这里让文字按 SCALE 倍点阵化、矢量元素整体放大、logo 用当前色高清重染，
+PrintWindow 只负责采集 Tk 画布自身的渲染结果，背景与桌面完全解耦。
+壁纸资产：assets/wallpaper.png 缺失时自动抓当前桌面壁纸缩存入库（一次性，
+提交到仓库），此后渲染结果完全确定；想换氛围直接替换该文件再跑。
 用法: python tools/panel_render.py
 产物: docs/panel.png（README 用，已带圆角）
 """
@@ -14,7 +15,6 @@ import ctypes.wintypes as wt
 import os
 import queue
 import sys
-import time
 import tkinter as tk
 import tkinter.font as tkfont
 
@@ -28,14 +28,51 @@ os.chdir(ROOT)
 SCALE = 2.5      # 440×296 → 1100×740，README 以 440px 展示正好 2.5x 密度
 RADIUS = 28      # 圆角半径（源图像素）
 OUT = os.path.join(ROOT, "docs", "panel.png")
+WALLPAPER = os.path.join(ROOT, "assets", "wallpaper.png")
+BLUR_RADIUS = 8    # 亚克力模糊强度（合成尺寸下的高斯半径），高透
+TINT_ALPHA = 0.12  # 玻璃压暗比例，高透（实机 GLASS_TINT stipple 为 25%）
 
 
-def toggle_desktop():
-    """Win+D：显示/还原桌面。截玻璃底前清空背景，采完还原窗口。"""
-    user32.keybd_event(0x5B, 0, 0, 0)    # LWIN down
-    user32.keybd_event(0x44, 0, 0, 0)    # D down
-    user32.keybd_event(0x44, 0, 2, 0)    # D up
-    user32.keybd_event(0x5B, 0, 2, 0)    # LWIN up
+def cover_crop(img, w, h):
+    """等比放大到铺满 w×h 后居中裁切"""
+    from PIL import Image
+    scale = max(w / img.width, h / img.height)
+    img = img.resize((round(img.width * scale), round(img.height * scale)),
+                     Image.LANCZOS)
+    x = (img.width - w) // 2
+    y = (img.height - h) // 2
+    return img.crop((x, y, x + w, y + h))
+
+
+def load_wallpaper(size):
+    """玻璃底用壁纸：优先仓库资产；缺失时抓当前桌面壁纸缩存入库（一次性）"""
+    from PIL import Image, ImageDraw
+    if os.path.exists(WALLPAPER):
+        return Image.open(WALLPAPER).convert("RGB")
+    buf = ctypes.create_unicode_buffer(260)
+    user32.SystemParametersInfoW(0x0073, 260, buf, 0)   # SPI_GETDESKWALLPAPER
+    if buf.value and os.path.exists(buf.value):
+        img = Image.open(buf.value).convert("RGB")
+    else:   # 纯色/幻灯片壁纸取不到文件路径时，退化为深蓝灰渐变
+        img = Image.new("RGB", (1920, 1080))
+        d = ImageDraw.Draw(img)
+        for y in range(img.height):
+            t = y / img.height
+            d.line([(0, y), (img.width, y)],
+                   fill=(int(38 + 22 * t), int(48 + 26 * t), int(66 + 30 * t)))
+    img = cover_crop(img, *size)
+    img.save(WALLPAPER, optimize=True)
+    print("wallpaper asset ->", WALLPAPER)
+    return img
+
+
+def glass_background(m, size):
+    """亚克力玻璃底：壁纸高斯模糊后向 GLASS_TINT 压暗 25%，
+    与实机“黑即玻璃 + GLASS_TINT stipple gray25”的叠加数学对齐"""
+    from PIL import Image, ImageFilter
+    base = load_wallpaper(size).filter(ImageFilter.GaussianBlur(BLUR_RADIUS))
+    tint = Image.new("RGB", base.size, m.GLASS_TINT)
+    return Image.blend(base, tint, TINT_ALPHA)
 
 
 def hi_res_panel(m):
@@ -66,8 +103,14 @@ def hi_res_panel(m):
     app._panel = None
     app.save_action = lambda: None
 
+    # 渲染窗口不需要 DWM 玻璃：玻璃底已软件合成进画布。开着它 PrintWindow
+    # 会把窗口背后的桌面模糊混进半透明区域（壁纸垫底不生效的根因），
+    # 关掉后采集的是纯 GDI 表面，与桌面彻底解耦
+    m.enable_glass = lambda hwnd: False
+
     panel = m.GlassPanel(app)
     win, cv = panel.win, panel.canvas
+    win.withdraw()   # 先不出窗口：背景铺好后再见人
     sw, sh = round(m.PANEL_W * SCALE), round(m.PANEL_H * SCALE)
 
     # 1) 矢量元素整体 ×SCALE；线条宽度不在 canvas.scale 之列，手动同步
@@ -107,11 +150,22 @@ def hi_res_panel(m):
             panel._photo = ImageTk.PhotoImage(tinted)
             cv.create_image(x0, y0, anchor=anchor, image=panel._photo)
 
-    # 4) 窗口放大并重新锚定工作区右下角
+    # 4) 玻璃底软件合成：删掉画布上的玻璃底矩形（全画布唯一的 rectangle），
+    #    垫入模糊压暗的壁纸。此后采集结果与窗口背后的桌面完全无关
+    for item in cv.find_withtag("all"):
+        if cv.type(item) == "rectangle":
+            cv.delete(item)
+    from PIL import ImageTk
+    panel._wp_photo = ImageTk.PhotoImage(glass_background(m, (sw, sh)))
+    wp_item = cv.create_image(0, 0, anchor="nw", image=panel._wp_photo)
+    cv.tag_lower(wp_item)
+
+    # 5) 窗口放大并重新锚定工作区右下角（仅摆放位置，采集不依赖桌面）
     wa = m.work_area()
     win.geometry("%dx%d+%d+%d" % (sw, sh, wa.right - sw - 12, wa.bottom - sh - 12))
     cv.configure(width=sw, height=sh)
     win.update_idletasks()
+    win.deiconify()   # 背景已铺好，再出窗口
 
     def grab():
         from menu_qa import grab_img
@@ -140,9 +194,6 @@ def main():
     import eye_care_u as m
     m.tk = tk
 
-    toggle_desktop()          # 最小化全部窗口，桌面作为玻璃背景
-    time.sleep(1.0)           # 等最小化动画结束
-
     panel, grab, root = hi_res_panel(m)
 
     def finish():
@@ -151,10 +202,8 @@ def main():
         print("panel ->", OUT, img.size)
         panel.close()
         root.destroy()
-        time.sleep(0.3)
-        toggle_desktop()      # 还原窗口
 
-    root.after(400, finish)   # 等玻璃合成稳定再采集
+    root.after(400, finish)   # 等画布渲染稳定再采集
     root.mainloop()
 
 

@@ -32,13 +32,16 @@ build.bat                                    # 打包（先托盘 Exit 退出运
 ## README 截图（docs/panel.png）
 
 - 由 `tools/panel_render.py` 生成，不是手动截图：真实 GlassPanel 按
-  SCALE=2.5 重渲染（文字 2.5 倍点阵化、矢量元素整体放大、logo 高清
-  重缩放），PrintWindow 采集玻璃底，最后烤 28px 圆角
+  SCALE=2.5 重渲染（文字 2.5 倍点阵化、矢量元素整体放大、logo 用当前色
+  高清重染），PrintWindow 只采集 Tk 画布自身，最后烤 28px 圆角
 - 实机渲染分辨率有限（见下节 DPI），截屏后位图拉伸必然发虚，
   禁止用"截屏再放大"替代该工具
-- 运行时会 Win+D 最小化全部窗口、以桌面壁纸作亚克力背景，采完自动还原；
-  屏幕会短暂闪现面板，属正常
-- 玻璃底采的是当前桌面，效果随壁纸变化；想要特定氛围先换壁纸再跑
+- 玻璃底由仓库壁纸资产 assets/wallpaper.png 软件合成（高斯模糊 + 25%
+  压暗，对齐实机 GLASS_TINT stipple 的叠加数学），不再 Win+D、不采桌面
+- 渲染窗口必须关 DWM 玻璃、先铺背景后显示窗口：DWM 玻璃开着时
+  PrintWindow 会把窗口背后的桌面模糊混进半透明区域（踩过的坑）
+- 资产缺失时 panel_render 自动抓当前桌面壁纸缩存入库；想换氛围直接
+  替换 assets/wallpaper.png 再跑
 - README 以 `<p align="center"><img width="440">` 居中展示
   （1100 ÷ 440 = 2.5x 密度），改显示宽度时保持与 SCALE 的整倍数关系
 - 面板配色读取 `dist/eye_care_u_settings.json` 当前值，截图展示真实使用状态
