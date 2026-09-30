@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """托盘控制面板 QA：渲染截图（README 用）+ Save 合成点击 + 真实鼠标穿透测试。
 用法: .build-venv/Scripts/python tools/menu_qa.py
-产物: docs/panel.png（面板截图，供 README 使用）、tools/menu_shot.png（QA 留档）
+产物: tools/menu_shot.png（QA 留档；README 用图由 tools/panel_render.py 生成）
 """
 import ctypes
 import ctypes.wintypes as wt
